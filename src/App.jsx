@@ -1,22 +1,40 @@
 import React, { useEffect, useState } from "react";
+import { fetchWithCsrf } from "./apiClient.js";
 
 const API_BASE = "http://localhost:3001";
 
 export default function App() {
   const [email, setEmail] = useState("demo@example.com");
   const [message, setMessage] = useState("Not submitted yet");
+  const [csrfToken, setCsrfToken] = useState("");
 
   useEffect(() => {
     fetch(`${API_BASE}/api/session`, {
       credentials: "include",
-    }).catch(() => setMessage("Session initialization failed"));
+    })
+      .then(async (res) => {
+        if (!res.ok) {
+          setMessage("Session initialization failed");
+          return;
+        }
+        const data = await res.json();
+        setMessage("Session ready");
+        if (data.csrfToken) {
+          setCsrfToken(data.csrfToken);
+        }
+      })
+      .catch(() => setMessage("Session initialization failed"));
   }, []);
 
   async function submitEmail(event) {
     event.preventDefault();
-    const response = await fetch(`${API_BASE}/api/account/email`, {
+    if (!csrfToken) {
+      setMessage("Missing CSRF token");
+      return;
+    }
+
+    const response = await fetchWithCsrf(csrfToken, `${API_BASE}/api/account/email`, {
       method: "POST",
-      credentials: "include",
       headers: {
         "Content-Type": "application/json",
       },
